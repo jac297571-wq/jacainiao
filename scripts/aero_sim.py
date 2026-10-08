@@ -117,17 +117,18 @@ def main():
         print(out[-1], flush=True)
 
     # 反推：解释观测到的小号偏移需要多大的质量差
-    tilt = 0.1539 / 0.1286 - 1  # 2022 年后：1-12 号单号出现率 0.1539，13-35 号约 0.1286（总和守恒）
-    out += ["\n## 反推：要造成观测到的小号偏移，1-12 号球需要轻多少？\n",
-            f"2022 年后 1-12 号与 13-35 号的单号出现率之比 ≈ {1 + tilt:.3f}（相对差 {tilt * 100:.1f}%）。\n",
-            "| U0/v_t | 所需质量差（1-12 号比其余轻） | 约合 |",
-            "|---|---|---|"]
+    r_small = 0.1539  # 2022 年后 1-12 号单号出现率
+    r_rest = (5 - 12 * r_small) / 23  # 每期 5 个号总和守恒 → 13-35 号单号出现率
+    tilt = r_small / r_rest - 1
+    out += ["\n## 反推：要造成观测到的小号偏移，1-12 号球需要差多少？\n",
+            f"2022 年后 1-12 号与 13-35 号的单号出现率之比 ≈ {1 + tilt:.3f}（相对差 {tilt * 100:.1f}%）。",
+            "两种解释二选一：1-12 号球整体更轻，或整体更大。\n",
+            "| U0/v_t | 所需质量差（更轻） | 约合 | 或 所需直径差（更大） | 约合 |",
+            "|---|---|---|---|---|"]
     for ratio, lam, em, ed in rows:
-        if em < -0.05:
-            dm = np.expm1(np.log1p(tilt) / em)  # (1+dm)^em = 1+tilt
-            out.append(f"| {ratio:.1f} | {-dm * 100:.1f}% | {-dm * M0 * 1000:.2f} g |")
-        else:
-            out.append(f"| {ratio:.1f} | 质量几乎不影响（e≈0），无法由质量差解释 | — |")
+        dm = -np.expm1(np.log1p(tilt) / em)  # (1+x)^e = 1+tilt
+        dd = np.expm1(np.log1p(tilt) / ed)
+        out.append(f"| {ratio:.1f} | {dm * 100:.1f}% | {dm * M0 * 1000:.2f} g | {dd * 100:.1f}% | {dd * D0 * 1000:.2f} mm |")
     text = "\n".join(out) + "\n"
     (ROOT / "report_aero.md").write_text(text, encoding="utf-8")
     print(text)
