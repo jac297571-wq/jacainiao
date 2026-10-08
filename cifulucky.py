@@ -26,7 +26,7 @@ ROOT = Path(__file__).resolve().parent
 DATA = ROOT / "data" / "dlt_history.csv"
 PICKS = ROOT / "picks"
 TICKETS = 5
-WINDOW = 500  # 用最近多少期估计小号偏移
+MACHINE_SINCE = "19104"  # 新“维纳斯”摇奖机 2019-09-07 启用后的首期；小号偏移按此后数据估计
 SHRINK = 0.5  # 向均匀收缩一半，防止过度押注
 rng = secrets.SystemRandom()
 
@@ -38,7 +38,7 @@ def load():
 
 def small_weight(draws):
     """返回 (1-12 号的权重倍数, z 值)。z<=2 时权重为 1（均匀）"""
-    recent = draws[-WINDOW:]
+    recent = [d for d in draws if d[0] >= MACHINE_SINCE]
     s = [sum(x <= 12 for x in r) for _, r, _ in recent]
     mean, th = sum(s) / len(s), 5 * 12 / 35
     var = 5 * (12 / 35) * (23 / 35) * (30 / 34)
