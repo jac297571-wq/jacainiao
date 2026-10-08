@@ -3,7 +3,7 @@
 思路：
   1. 唯一的统计信号——近年前区 1-12 号偏多——每次用最新数据重新检验；
      显著（z>2）才按收缩后的比例加权，信号消失自动退回均匀随机。
-  2. 过滤“好看”的热门组合（连号、等差、全奇偶、复制上期），中了少被平分。
+  2. 可选（--anti-split）：过滤“好看”的热门组合，不影响中奖率，只影响中了后被平分的程度。
   3. 5 注之间前区最多重 2 个号、后区互不相同，覆盖面最大。
   4. 选号写入 picks/，开奖后用 check 对奖，长期记录真实表现。
 
@@ -88,18 +88,18 @@ def popular(r, last):
     )
 
 
-def generate(draws):
+def generate(draws, anti_split=False):
     w, z = small_weight(draws)
     last = draws[-1][1]
     fronts, backs = [], []
     while len(fronts) < TICKETS:
         r = weighted_sample(w)
-        if popular(r, last) or any(len(set(r) & set(f)) > 2 for f in fronts):
+        if (anti_split and popular(r, last)) or any(len(set(r) & set(f)) > 2 for f in fronts):
             continue
         fronts.append(r)
     while len(backs) < TICKETS:
         b = sorted(rng.sample(range(1, 13), 2))
-        if b[1] - b[0] != 1 and b not in backs:  # 后区连号也是热门
+        if b not in backs and not (anti_split and b[1] - b[0] == 1):  # 后区连号也是热门
             backs.append(b)
     return list(zip(fronts, backs)), w, z
 
@@ -124,7 +124,7 @@ def cmd_pick(args):
         mod.main()
     draws = load()
     issue = next_issue(draws[-1][0])
-    tickets, w, z = generate(draws)
+    tickets, w, z = generate(draws, args.anti_split)
     print(f"第 {issue} 期（数据截至 {draws[-1][0]}）")
     sig = f"z={z:+.2f}，1-12 号权重 ×{w:.3f}" if w > 1 else f"z={z:+.2f}，信号不显著，均匀随机"
     print(f"小号信号：{sig}\n")
@@ -165,6 +165,7 @@ if __name__ == "__main__":
     ap = argparse.ArgumentParser(description="cifulucky：每期 5 注选号器")
     ap.add_argument("cmd", nargs="?", default="pick", choices=["pick", "check"])
     ap.add_argument("--update", action="store_true", help="先抓取最新开奖数据")
+    ap.add_argument("--anti-split", action="store_true", help="过滤热门组合，减少中奖后被平分")
     ap.add_argument("--force", action="store_true", help="覆盖已存在的本期选号")
     a = ap.parse_args()
     (cmd_pick if a.cmd == "pick" else cmd_check)(a)
