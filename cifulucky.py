@@ -14,6 +14,7 @@
   python3 cifulucky.py              # 生成下一期 5 注
   python3 cifulucky.py --update     # 先抓取最新开奖再生成
   python3 cifulucky.py check        # 核对所有历史选号
+  python3 cifulucky.py sprt         # 01-11 信号的序贯检验：累积证据，到阈值自动判真/判假
 """
 import argparse
 import csv
@@ -218,11 +219,36 @@ def cmd_check(_):
             print(f"  {k[0]}+{k[1]}: {total[k]} 注")
 
 
+SPRT_START = "26115"  # 前瞻起点：此前数据已用于提出假设，不计入裁决
+SPRT_W1 = 1.10  # 备择假设：01-11 权重 ×1.10；零假设：×1.00
+SPRT_A, SPRT_B = log(19), -log(19)  # 两类错误率各约 5%
+
+
+def cmd_sprt(_):
+    """序贯概率比检验：逐期累积对数似然比，越过上界判“信号为真”，越过下界判“信号为假”"""
+    rows = [r for r in csv.DictReader(ORDER_DATA.open(encoding="utf-8")) if r["issue"] >= SPRT_START and r["order"]]
+    lw1 = log(SPRT_W1)
+    L = 0.0
+    print(f"SPRT：H0 01-{STEP:02d} 权重 ×1.00  vs  H1 ×{SPRT_W1:.2f}；起点 {SPRT_START}；上界 {SPRT_A:+.2f}，下界 {SPRT_B:+.2f}")
+    print("（按模拟，平均需要约 400–650 期、即约 3–4 年才能下结论）\n")
+    for r in rows:
+        o = list(map(int, r["order"].split()))[:5]
+        step = pl_loglik(lw1, [o]) - pl_loglik(0.0, [o])
+        L += step
+        print(f"  {r['issue']}  前区出球 {' '.join(f'{x:02d}' for x in o)}  本期 {step:+.3f}  累计 {L:+.3f}")
+        if L >= SPRT_A or L <= SPRT_B:
+            break
+    if not rows:
+        print("  尚无前瞻数据（先 --update）")
+    verdict = "✅ 判定：信号为真" if L >= SPRT_A else ("✗ 判定：信号为假（只是巧合）" if L <= SPRT_B else "… 尚未下结论，继续观察")
+    print(f"\n累计 {L:+.3f}，已观察 {len(rows)} 期。{verdict}")
+
+
 if __name__ == "__main__":
     ap = argparse.ArgumentParser(description="cifulucky：每期 5 注选号器")
-    ap.add_argument("cmd", nargs="?", default="pick", choices=["pick", "check"])
+    ap.add_argument("cmd", nargs="?", default="pick", choices=["pick", "check", "sprt"])
     ap.add_argument("--update", action="store_true", help="先抓取最新开奖数据")
     ap.add_argument("--anti-split", action="store_true", help="过滤热门组合，减少中奖后被平分")
     ap.add_argument("--force", action="store_true", help="覆盖已存在的本期选号")
     a = ap.parse_args()
-    (cmd_pick if a.cmd == "pick" else cmd_check)(a)
+    {"pick": cmd_pick, "check": cmd_check, "sprt": cmd_sprt}[a.cmd](a)
