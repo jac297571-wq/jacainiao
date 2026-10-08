@@ -1,8 +1,9 @@
 """cifulucky：每期 5 注单式选号器。
 
 思路：
-  1. 唯一的统计信号——近年前区 1-12 号偏多——每次用最新数据重新检验；
+  1. 小号信号——近年前区 1-12 号偏多——每次用最新数据重新检验；
      显著（z>2）才按收缩后的比例加权，信号消失自动退回均匀随机。
+  1b. 连号信号——同期出现连号略多于理论（疑似混合不充分）——显著时每注至少含 1 对连号。
   2. 可选（--anti-split）：过滤“好看”的热门组合，不影响中奖率，只影响中了后被平分的程度。
   3. 5 注之间前区最多重 2 个号、后区互不相同，覆盖面最大。
   4. 选号写入 picks/，开奖后用 check 对奖，长期记录真实表现。
@@ -45,6 +46,15 @@ def small_weight(draws):
     if z <= 2:
         return 1.0, z
     return 1 + (mean / th - 1) * SHRINK, z
+
+
+def consec_signal(draws):
+    """全部历史中“同期有连号”的比例 vs 理论（混合不充分假设）。返回 (是否启用, z)"""
+    from math import comb
+    th = 1 - comb(31, 5) / comb(35, 5)
+    k = sum(any(b - a == 1 for a, b in zip(sorted(r), sorted(r)[1:])) for _, r, _ in draws)
+    z = (k / len(draws) - th) / sqrt(th * (1 - th) / len(draws))
+    return z > 2, z
 
 
 def weighted_sample(w_small, k=5):
@@ -90,10 +100,13 @@ def popular(r, last):
 
 def generate(draws, anti_split=False):
     w, z = small_weight(draws)
+    need_consec, cz = consec_signal(draws)
     last = draws[-1][1]
     fronts, backs = [], []
     while len(fronts) < TICKETS:
         r = weighted_sample(w)
+        if need_consec and max_run(r) < 2:
+            continue
         if (anti_split and popular(r, last)) or any(len(set(r) & set(f)) > 2 for f in fronts):
             continue
         fronts.append(r)
@@ -101,7 +114,7 @@ def generate(draws, anti_split=False):
         b = sorted(rng.sample(range(1, 13), 2))
         if b not in backs and not (anti_split and b[1] - b[0] == 1):  # 后区连号也是热门
             backs.append(b)
-    return list(zip(fronts, backs)), w, z
+    return list(zip(fronts, backs)), w, z, need_consec, cz
 
 
 def next_issue(issue):
@@ -124,10 +137,11 @@ def cmd_pick(args):
         mod.main()
     draws = load()
     issue = next_issue(draws[-1][0])
-    tickets, w, z = generate(draws, args.anti_split)
+    tickets, w, z, need_consec, cz = generate(draws, args.anti_split)
     print(f"第 {issue} 期（数据截至 {draws[-1][0]}）")
     sig = f"z={z:+.2f}，1-12 号权重 ×{w:.3f}" if w > 1 else f"z={z:+.2f}，信号不显著，均匀随机"
-    print(f"小号信号：{sig}\n")
+    print(f"小号信号：{sig}")
+    print(f"连号信号：z={cz:+.2f}，" + ("每注至少含 1 对连号" if need_consec else "不显著，不限制") + "\n")
     for i, (r, b) in enumerate(tickets, 1):
         print(f"  {i}. {fmt(r, b)}")
     PICKS.mkdir(exist_ok=True)
@@ -136,6 +150,7 @@ def cmd_pick(args):
         print(f"\n{f.name} 已存在，未覆盖（--force 可覆盖）")
         return
     f.write_text(json.dumps({"issue": issue, "small_z": round(z, 3), "small_w": round(w, 4),
+                             "consec_z": round(cz, 3), "consec": need_consec,
                              "tickets": [{"red": r, "blue": b} for r, b in tickets]}, ensure_ascii=False, indent=1))
     print(f"\n已保存 picks/{f.name}")
 
