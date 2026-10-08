@@ -36,9 +36,23 @@ def main(listfile, outdir, limit=20):
         tag = title.replace("体彩开奖直播", "").strip() or date
         mp4 = out / f"{tag}.mp4"
         if not mp4.exists():
-            meta = json.loads(get(API.format(vid)))
-            src = meta["data"]["videos"][0]["dispatch_result"]["url"]
-            mp4.write_bytes(get(src, binary=True, timeout=300))
+            try:
+                meta = json.loads(get(API.format(vid)))
+                src = meta["data"]["videos"][0]["dispatch_result"]["url"]
+                # curl 断点续传 + 重试，CDN 经常断开连接
+                tmp = mp4.with_suffix(".part")
+                for _ in range(12):
+                    r = subprocess.run(["curl", "-sS", "-L", "-C", "-", "-m", "300", "-A", UA["User-Agent"],
+                                        "-H", f"Referer: {UA['Referer']}", "-o", str(tmp), src])
+                    if r.returncode == 0:
+                        break
+                    time.sleep(3)
+                if r.returncode != 0:
+                    raise RuntimeError("curl failed")
+                tmp.rename(mp4)
+            except Exception as e:
+                print(date, tag, "下载失败，跳过：", e, flush=True)
+                continue
         grid = out / f"{tag}_grid.jpg"
         subprocess.run(["ffmpeg", "-v", "error", "-y", "-ss", "300", "-i", str(mp4), "-vf",
                         "fps=1/8,scale=256:-1,tile=6x6", "-frames:v", "1", str(grid)], check=False)
