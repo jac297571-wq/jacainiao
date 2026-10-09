@@ -227,6 +227,38 @@ def cmd_check(_):
         print("\n累计命中分布（前区+后区）：")
         for k in sorted(total, reverse=True):
             print(f"  {k[0]}+{k[1]}: {total[k]} 注")
+    paper_alpha(draws)
+
+
+PAPER_START = "26115"  # 纸面记账起点（此前数据已用于提出假设）
+
+
+def paper_alpha(draws):
+    """纸面记账的 alpha 指标：看信号本身，而不是中没中奖（中奖几乎全是运气）"""
+    rows = [(i, r) for i, (r, _) in sorted(draws.items()) if i >= PAPER_START]
+    n = len(rows)
+    print(f"\n纸面记账 alpha（自 {PAPER_START} 起，已开奖 {n} 期）")
+    if n == 0:
+        print("  尚无数据")
+        return
+    blue = [sum(1 for x in r if x <= BLUE) for _, r in rows]
+    mean = sum(blue) / n
+    var = 5 * (7 / 35) * (28 / 35) * (30 / 34)
+    z = (mean - 1.0) / sqrt(var / n)
+    print(f"  每期蓝球（01-{BLUE:02d}）个数：均值 {mean:.3f}（随机 1.000；信号为真时约 1.08），z={z:+.2f}")
+    # 我们的选号相对“随机机选”的前区平均命中
+    hits, cnt = 0, 0
+    for f in sorted(PICKS.glob("*.json")):
+        pk = json.loads(f.read_text())
+        if pk["issue"] < PAPER_START or pk["issue"] not in draws:
+            continue
+        R = set(draws[pk["issue"]][0])
+        for t in pk["tickets"]:
+            hits += len(set(t["red"]) & R)
+            cnt += 1
+    if cnt:
+        print(f"  我们每注前区平均命中 {hits / cnt:.3f}（随机机选期望 0.714），共 {cnt} 注")
+    print("  提示：要区分 1.00 和 1.08，大约需要 400–600 期；前期的起伏都是噪声。")
 
 
 SPRT_START = "26115"  # 前瞻起点：此前数据已用于提出假设，不计入裁决
