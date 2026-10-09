@@ -16,6 +16,7 @@
   python3 cifulucky.py              # 生成下一期 5 注
   python3 cifulucky.py --update     # 先抓取最新开奖再生成
   python3 cifulucky.py check        # 核对所有历史选号
+  python3 cifulucky.py watch        # 新球颜色偏差告警（CUSUM），盯住下一次换球
   python3 cifulucky.py sprt         # 01-11 信号的序贯检验：累积证据，到阈值自动判真/判假
 """
 import argparse
@@ -253,11 +254,56 @@ def cmd_sprt(_):
     print(f"\n累计 {L:+.3f}，已观察 {len(rows)} 期。{verdict}")
 
 
+COLORS = ["蓝 01-07", "黑 08-14", "红 15-21", "黄 22-28", "绿 29-35"]
+WATCH_W = 1.3  # 监控的偏差幅度（某颜色 ×1.3 或 ÷1.3）
+WATCH_H = log(99)  # CUSUM 告警阈值；纯随机下 10 个监控量合计约每 1000 期误报 0.85 次
+
+
+def _color_llr(draw, c, w):
+    k = sum(1 for x in draw if (x - 1) // 7 == c)
+    p0, p1 = 0.2, 0.2 * w / (0.2 * w + 0.8)
+    return k * log(p1 / p0) + (5 - k) * log((1 - p1) / (1 - p0))
+
+
+def cmd_watch(_):
+    """新球颜色偏差告警：对 5 种颜色 × 偏高/偏低 做 CUSUM。
+    依据：2007 年那批球的绿色偏差（×1.4）从第一年就存在，告警器回测在第 64 期即报警；
+    若将来换新球，新偏差可能从第一天就出现。"""
+    draws = load()
+    S = {(c, w): 0.0 for c in range(5) for w in (WATCH_W, 1 / WATCH_W)}
+    alarms = []
+    for issue, r, _ in draws:
+        for key in S:
+            S[key] = max(0.0, S[key] + _color_llr(r, *key))
+            if S[key] >= WATCH_H:
+                alarms.append((issue, COLORS[key[0]], "偏高" if key[1] > 1 else "偏低"))
+                S[key] = 0.0
+    print(f"颜色偏差 CUSUM 监控（阈值 {WATCH_H:.2f}；数据截至 {draws[-1][0]}）\n")
+    print("  颜色          偏高累计   偏低累计")
+    for c in range(5):
+        hi, lo = S[(c, WATCH_W)], S[(c, 1 / WATCH_W)]
+        bar = lambda v: "█" * int(v / WATCH_H * 20)
+        print(f"  {COLORS[c]}   {hi:5.2f} {bar(hi):<20} {lo:5.2f} {bar(lo):<20}")
+    print("\n最近的告警：")
+    for a_ in alarms[-8:]:
+        print(f"  {a_[0]}  {a_[1]} {a_[2]}")
+    recent = [a_ for a_ in alarms if a_[0] >= draws[-300][0]]
+    same = {}
+    for a_ in recent:
+        same[(a_[1], a_[2])] = same.get((a_[1], a_[2]), 0) + 1
+    hot = [(k, v) for k, v in same.items() if v >= 2]
+    if hot:
+        print("\n⚠ 近 300 期内同一颜色同方向多次告警：" + "，".join(f"{k[0]}{k[1]}×{v}" for k, v in hot)
+              + "。可能是换了新球或出现新的颜色偏差，值得重点关注。")
+    else:
+        print("\n近 300 期没有持续性的颜色偏差（偶发单次告警属于正常误报范围）。")
+
+
 if __name__ == "__main__":
     ap = argparse.ArgumentParser(description="cifulucky：每期 5 注选号器")
-    ap.add_argument("cmd", nargs="?", default="pick", choices=["pick", "check", "sprt"])
+    ap.add_argument("cmd", nargs="?", default="pick", choices=["pick", "check", "sprt", "watch"])
     ap.add_argument("--update", action="store_true", help="先抓取最新开奖数据")
     ap.add_argument("--anti-split", action="store_true", help="过滤热门组合，减少中奖后被平分")
     ap.add_argument("--force", action="store_true", help="覆盖已存在的本期选号")
     a = ap.parse_args()
-    {"pick": cmd_pick, "check": cmd_check, "sprt": cmd_sprt}[a.cmd](a)
+    {"pick": cmd_pick, "check": cmd_check, "sprt": cmd_sprt, "watch": cmd_watch}[a.cmd](a)
