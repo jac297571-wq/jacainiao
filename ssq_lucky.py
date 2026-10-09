@@ -51,6 +51,18 @@ def hot_signal(rows):
     return n, k, z
 
 
+def radar_hot(game_name):
+    """运行雷达（不联网，只用本地最新数据），返回该彩种下注档最热的号码；没有则返回 None"""
+    import subprocess, sys as _sys
+    root = Path(__file__).resolve().parent
+    while not (root / "radar.py").exists():
+        root = root.parent
+    subprocess.run([_sys.executable, str(root / "radar.py")], check=False, capture_output=True)
+    st = json.loads((root / "radar_status.json").read_text()).get(game_name, {})
+    bet = st.get("bet", [])
+    return bet[0] if bet else None
+
+
 def next_issue(issue):
     return str(int(issue) + 1)
 
@@ -64,15 +76,17 @@ def cmd_pick(a):
         update()
     rows = load()
     n, k, z = hot_signal(rows)
-    use = z > 2
+    radar = radar_hot("双色球")
+    use = radar is not None
+    hot = radar if use else HOT
     issue = next_issue(rows[-1][0])
     print(f"双色球 第 {issue} 期（数据截至 {rows[-1][0]}）")
-    print(f"热球 {HOT:02d}：自 {HOT_SINCE} 起 {k}/{n} 期 = {k / n:.3f}（理论 {P0:.3f}），z={z:+.2f}，"
-          + ("信号成立，每注都含 24" if use else "信号消失，均匀随机"))
+    print(f"红球 24（前瞻检验对象）：自 {HOT_SINCE} 起 {k}/{n} 期 = {k / n:.3f}（理论 {P0:.3f}），z={z:+.2f}")
+    print(f"雷达下注档热球：{hot:02d}，每注都含它" if use else "雷达下注档无热球，均匀随机")
     tickets, blues = [], []
-    others = [x for x in range(1, 34) if x != HOT]
+    others = [x for x in range(1, 34) if x != hot]
     while len(tickets) < 5:
-        r = sorted(([HOT] if use else []) + rng.sample(others if use else list(range(1, 34)), 5 if use else 6))
+        r = sorted(([hot] if use else []) + rng.sample(others if use else list(range(1, 34)), 5 if use else 6))
         if r in tickets or any(len(set(r) & set(t)) > (3 if use else 2) for t in tickets):
             continue
         tickets.append(r)
@@ -88,7 +102,7 @@ def cmd_pick(a):
     if f.exists() and not a.force:
         print(f"\n{f.name} 已存在，未覆盖（--force 可覆盖）")
         return
-    f.write_text(json.dumps({"issue": issue, "hot": HOT, "hot_z": round(z, 3), "use_hot": use,
+    f.write_text(json.dumps({"issue": issue, "hot": hot if use else None, "z24": round(z, 3),
                              "tickets": [{"red": r, "blue": b} for r, b in zip(tickets, blues)]}, ensure_ascii=False, indent=1))
     print(f"\n已保存 picks_ssq/{f.name}")
 

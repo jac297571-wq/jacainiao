@@ -141,6 +141,7 @@ def generate(draws, anti_split=False):
     use_blue = bz > 2
     # 01-07 是 01-11 的子集：两种解释下，全蓝组合都是概率最高的区域
     pool = list(range(1, BLUE + 1)) if use_blue else (list(range(1, STEP + 1)) if use_step else list(range(1, 36)))
+    hot = radar_hot("大乐透")  # 雷达下注档热球：每注都含它（随机情形下没有代价）
     need_consec, cz = consec_signal(draws)
     last = draws[-1][1]
     fronts, backs = [], []
@@ -149,7 +150,7 @@ def generate(draws, anti_split=False):
         tries += 1
         if tries % 20000 == 0:  # 号码池小时放宽注间重叠限制
             max_overlap += 1
-        r = sorted(rng.sample(pool, 5))
+        r = sorted([hot] + rng.sample([x for x in pool if x != hot], 4)) if hot else sorted(rng.sample(pool, 5))
         if need_consec and max_run(r) < 2:
             continue
         if (anti_split and popular(r, last)) or r in fronts or any(len(set(r) & set(f)) > max_overlap for f in fronts):
@@ -160,9 +161,21 @@ def generate(draws, anti_split=False):
         if b not in backs and not (anti_split and b[1] - b[0] == 1):  # 后区连号也是热门
             backs.append(b)
     info = {"step_w_raw": w_raw, "step_w": w, "step_z": z, "step_n": n, "use_step": use_step,
-            "blue_w_raw": bw_raw, "blue_w": bw, "blue_z": bz, "use_blue": use_blue, "pool": [pool[0], pool[-1]],
+            "radar_hot": hot, "blue_w_raw": bw_raw, "blue_w": bw, "blue_z": bz, "use_blue": use_blue, "pool": [pool[0], pool[-1]],
             "consec": need_consec, "consec_z": cz, "max_overlap": max_overlap}
     return list(zip(fronts, backs)), info
+
+
+def radar_hot(game_name):
+    """运行雷达（不联网，只用本地最新数据），返回该彩种下注档最热的号码；没有则返回 None"""
+    import subprocess, sys as _sys
+    root = Path(__file__).resolve().parent
+    while not (root / "radar.py").exists():
+        root = root.parent
+    subprocess.run([_sys.executable, str(root / "radar.py")], check=False, capture_output=True)
+    st = json.loads((root / "radar_status.json").read_text()).get(game_name, {})
+    bet = st.get("bet", [])
+    return bet[0] if bet else None
 
 
 def next_issue(issue):
@@ -191,7 +204,8 @@ def cmd_pick(args):
     print(f"蓝球信号（01-{BLUE:02d}，新机 {info['step_n']} 期出球顺序）：权重 ×{info['blue_w_raw']:.3f}，z={info['blue_z']:+.2f}"
           + ("，显著" if info["use_blue"] else "，不显著"))
     print(f"台阶信号（01-{STEP:02d}）：权重 ×{info['step_w_raw']:.3f}，z={info['step_z']:+.2f}" + ("，显著" if info["use_step"] else "，不显著"))
-    print(f"前区号码池：{info['pool'][0]:02d}-{info['pool'][1]:02d}")
+    print(f"前区号码池：{info['pool'][0]:02d}-{info['pool'][1]:02d}"
+          + (f"；雷达热球 {info['radar_hot']:02d}，每注都含它" if info.get("radar_hot") else "；雷达无热球"))
     print(f"连号信号：z={info['consec_z']:+.2f}，" + ("每注至少含 1 对连号" if info["consec"] else "不显著，不限制"))
     print()
     for i, (r, b) in enumerate(tickets, 1):

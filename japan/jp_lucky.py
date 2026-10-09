@@ -28,6 +28,18 @@ CFG = {
 rng = secrets.SystemRandom()
 
 
+def radar_hot(game_name):
+    """运行雷达（不联网，只用本地最新数据），返回该彩种下注档最热的号码；没有则返回 None"""
+    import subprocess, sys as _sys
+    root = Path(__file__).resolve().parent
+    while not (root / "radar.py").exists():
+        root = root.parent
+    subprocess.run([_sys.executable, str(root / "radar.py")], check=False, capture_output=True)
+    st = json.loads((root / "radar_status.json").read_text()).get(game_name, {})
+    bet = st.get("bet", [])
+    return bet[0] if bet else None
+
+
 def load(game):
     M = CFG[game]["M"]
     return [(int(d["id"]), [int(d[f"n{i}"]) for i in range(1, M + 1)], d["date"])
@@ -42,12 +54,16 @@ def cmd_pick(game, a):
         spec.loader.exec_module(mod)
         mod.fetch(game)
     rows = load(game)
-    K, M, hot = c["K"], c["M"], c["hot"]
+    K, M = c["K"], c["M"]
+    hot = radar_hot(c["title"])
+    if hot is None:
+        hot = c["hot"]  # 雷达无热球时沿用前瞻检验对象（随机情形下同样没有代价）
     after = [r for r in rows if r[0] >= c["since"]]
-    k = sum(hot in r[1] for r in after)
+    k = sum(c["hot"] in r[1] for r in after)
     issue = rows[-1][0] + 1
     print(f"{c['title']} 第{issue}回（数据截至 第{rows[-1][0]}回 {rows[-1][2]}）")
-    print(f"热球 {hot:02d}：自第{c['since']}回起 {k}/{len(after)} 回 = {k / len(after):.3f}（理论 {M / K:.3f}）\n")
+    print(f"前瞻检验对象 {c['hot']:02d}：自第{c['since']}回起 {k}/{len(after)} 回 = {k / len(after):.3f}（理论 {M / K:.3f}）")
+    print(f"本回每注都含热球 {hot:02d}（雷达下注档最热）\n")
     others = [x for x in range(1, K + 1) if x != hot]
     tickets = []
     while len(tickets) < 5:
