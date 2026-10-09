@@ -1,6 +1,8 @@
-"""ロト6 第一轮检验：整体均匀性、变点、セット球（A-J）指纹、套号可预测性、分套模型样本外打分。
-输出 japan/report_loto6.md。零假设：每回从 1-43 等概率无放回抽 6 个本数字。
+"""日本ロト系列（ロト6 / ロト7 / ミニロト）第一轮检验：整体均匀性、变点、セット球（A-J）指纹、套号可预测性、分套模型样本外打分。
+用法：python3 japan/scripts/loto6_analysis.py [loto6|loto7|miniloto] → japan/report_<game>.md
+零假设：每回从 1-K 等概率无放回抽 M 个本数字。
 """
+import sys
 import csv
 from collections import Counter
 from pathlib import Path
@@ -10,10 +12,13 @@ from scipy import stats
 from scipy.optimize import minimize
 
 ROOT = Path(__file__).resolve().parent.parent
-D = list(csv.DictReader((ROOT / "data" / "loto6.csv").open(encoding="utf-8")))
-N, K, M = len(D), 43, 6
-R = np.array([[int(d[f"n{i}"]) for i in range(1, 7)] for d in D])
-O = np.array([[int(d[f"o{i}"]) for i in range(1, 7)] for d in D]) - 1
+GAME = sys.argv[1] if len(sys.argv) > 1 else "loto6"
+TITLE, K, M = {"loto6": ("ロト6", 43, 6), "loto7": ("ロト7", 37, 7), "miniloto": ("ミニロト", 31, 5)}[GAME]
+D = list(csv.DictReader((ROOT / "data" / f"{GAME}.csv").open(encoding="utf-8")))
+N = len(D)
+R = np.array([[int(d[f"n{i}"]) for i in range(1, M + 1)] for d in D])
+HAS_ORDER = "o1" in D[0]
+O = np.array([[int(d[f"o{i}"]) for i in range(1, M + 1)] for d in D]) - 1 if HAS_ORDER else None
 SETS = np.array(["ABCDEFGHIJ".index(d["setball"]) for d in D])
 DATE = np.array([d["date"] for d in D])
 X = np.zeros((N, K))
@@ -34,8 +39,8 @@ def mc_chi(n, obs):
     return (np.sum(s >= obs) + 1) / (SIMS + 1)
 
 
-p("# ロト6 第一轮检验\n")
-p(f"数据：{N} 回（{DATE[0]} ~ {DATE[-1]}），每回本数字 6 个（1–43），セット球 A–J 共 10 套。\n")
+p(f"# {TITLE} 第一轮检验\n")
+p(f"数据：{N} 回（{DATE[0]} ~ {DATE[-1]}），每回本数字 {M} 个（1–{K}），セット球 A–J 共 10 套。\n")
 
 # ---------- A. 整体与分时段均匀性 ----------
 p("## A. 号码频率均匀性（分时段）\n")
@@ -50,7 +55,8 @@ for a, b in list(zip(edges[:-1], edges[1:])) + [(0, N)]:
     p(f"| 第{a + 1}–{b}回（{DATE[a][:4]}–{DATE[b - 1][:4]}） | {b - a} | {x2:.1f} | {mc_chi(b - a, x2):.3f} | {hot.tolist()} | {cold.tolist()} |")
 
 # ---------- B. 变点（三等分号段个数） ----------
-p("\n## B. 无监督变点（每回 1–14 号个数 / 30–43 号个数）\n")
+LO, HI = K // 3, K - K // 3 + 1
+p(f"\n## B. 无监督变点（每回 1–{LO} 号个数 / {HI}–{K} 号个数 / 合计）\n")
 
 
 def cusum(x, lo=60):
@@ -62,7 +68,7 @@ def cusum(x, lo=60):
     return j + 1, st[j]
 
 
-for name, f in (("1–14 号个数", lambda Rm: (Rm <= 14).sum(1)), ("30–43 号个数", lambda Rm: (Rm >= 30).sum(1)),
+for name, f in ((f"1–{LO} 号个数", lambda Rm: (Rm <= LO).sum(1)), (f"{HI}–{K} 号个数", lambda Rm: (Rm >= HI).sum(1)),
                 ("本数字合计", lambda Rm: Rm.sum(1))):
     x = f(R).astype(float)
     j, s = cusum(x)
@@ -93,10 +99,10 @@ def between(Xm, lab):
 
 obs = between(X, SETS)
 sims = [between(X, rng.permutation(SETS)) for _ in range(1000)]
-p(f"\n### C2. 10 套之间号码分布是否不同（套号置换检验）\n\n10×43 列联表 χ²={obs:.1f}，置换 p={(np.sum(np.array(sims) >= obs) + 1) / 1001:.3f}")
+p(f"\n### C2. 10 套之间号码分布是否不同（套号置换检验）\n\n10×{K} 列联表 χ²={obs:.1f}，置换 p={(np.sum(np.array(sims) >= obs) + 1) / 1001:.3f}")
 
 p("\n### C3. 每套的“号码指纹”能否前后复现？（セット球理论的核心）\n")
-p("每套按时间分前后两半，比较 43 个号码偏差的相关；真有固定指纹则 r 显著为正。\n")
+p(f"每套按时间分前后两半，比较 {K} 个号码偏差的相关；真有固定指纹则 r 显著为正。\n")
 p("| セット | 前半 | 后半 | r | 置换 p |")
 p("|---|---|---|---|---|")
 rs = []
@@ -109,7 +115,7 @@ for s in range(10):
     pr = (np.sum([np.corrcoef(a, rng.permutation(b))[0, 1] >= r for _ in range(2000)]) + 1) / 2001
     rs.append(r)
     p(f"| {'ABCDEFGHIJ'[s]} | 第{D[h1[0]]['id']}–{D[h1[-1]]['id']}回 | 第{D[h2[0]]['id']}–{D[h2[-1]]['id']}回 | {r:+.3f} | {pr:.3f} |")
-p(f"\n10 套平均 r={np.mean(rs):+.3f}（纯随机期望 ≈0）；Fisher 合并：z={np.mean(np.arctanh(rs)) * np.sqrt(10 * 40):+.2f}")
+p(f"\n10 套平均 r={np.mean(rs):+.3f}（纯随机期望 ≈0）；Fisher 合并：z={np.mean(np.arctanh(rs)) * np.sqrt(10 * (K - 3)):+.2f}")
 
 p("\n### C4. 下回用哪套能预测吗？\n")
 T = np.zeros((10, 10), int)
@@ -145,6 +151,10 @@ for k in (1, 3, 5):
     p(f"- 下回套号出现在前 {k} 回中的比例：{excl / tot2:.3f}（若独立随机约 {1 - 0.9 ** k:.3f}）")
 
 # ---------- D. 分套 Plackett-Luce 模型样本外打分 ----------
+if not HAS_ORDER:
+    (ROOT / f"report_{GAME}.md").write_text("\n".join(out) + "\n\n（该彩种数据无出球顺序，跳过 D 节出球模型。）\n", encoding="utf-8")
+    print("\n".join(out))
+    sys.exit(0)
 p("\n## D. 分套号码权重模型的样本外打分（按出球顺序，5 折时间分块）\n")
 
 
@@ -192,5 +202,5 @@ for per_set, lams in ((False, (100, 300, 1000)), (True, (100, 300, 1000))):
         p(f"| {'每套各自的号码权重' if per_set else '共同号码权重'} | {lam} | {sum(g):+.2f} | {' '.join(f'{x:+.1f}' for x in g)} |")
 
 text = "\n".join(out) + "\n"
-(ROOT / "report_loto6.md").write_text(text, encoding="utf-8")
+(ROOT / f"report_{GAME}.md").write_text(text, encoding="utf-8")
 print(text)
