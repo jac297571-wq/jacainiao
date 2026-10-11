@@ -17,11 +17,13 @@ import csv
 import importlib.util
 import json
 import secrets
+import sys
 from math import log
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent
 CFG = {
+    "loto6": {"title": "ロト6", "K": 43, "M": 6, "hot": None, "since": None, "p1": None, "start": None},
     "loto7": {"title": "ロト7", "K": 37, "M": 7, "hot": 22, "since": 658, "p1": 0.30, "start": 699},
     "miniloto": {"title": "ミニロト", "K": 31, "M": 5, "hot": 31, "since": 1363, "p1": 0.28, "start": 1408},
 }
@@ -58,18 +60,17 @@ def cmd_pick(game, a):
     hot = radar_hot(c["title"])
     if hot is None:
         hot = c["hot"]  # 雷达无热球时沿用前瞻检验对象（随机情形下同样没有代价）
-    after = [r for r in rows if r[0] >= c["since"]]
-    k = sum(c["hot"] in r[1] for r in after)
     issue = rows[-1][0] + 1
     print(f"{c['title']} 第{issue}回（数据截至 第{rows[-1][0]}回 {rows[-1][2]}）")
-    print(f"前瞻检验对象 {c['hot']:02d}：自第{c['since']}回起 {k}/{len(after)} 回 = {k / len(after):.3f}（理论 {M / K:.3f}）")
-    print(f"本回每注都含热球 {hot:02d}（雷达下注档最热）\n")
-    others = [x for x in range(1, K + 1) if x != hot]
-    tickets = []
-    while len(tickets) < 5:
-        t = sorted([hot] + rng.sample(others, M - 1))
-        if t not in tickets and all(len(set(t) & set(u)) <= M // 2 + 1 for u in tickets):
-            tickets.append(t)
+    if c["since"]:
+        after = [r for r in rows if r[0] >= c["since"]]
+        k = sum(c["hot"] in r[1] for r in after)
+        print(f"前瞻检验对象 {c['hot']:02d}：自第{c['since']}回起 {k}/{len(after)} 回 = {k / len(after):.3f}（理论 {M / K:.3f}）")
+    print("动态贝叶斯 PL 最优 5 注" + (f"，每注含热球 {hot:02d}" if hot else "（无热球）"))
+    sys.path.insert(0, str(ROOT.parent))
+    from bayes_pick import bayes_tickets, describe
+    tickets, binfo = bayes_tickets(c["title"], hot, 5)
+    print(describe(binfo, hot) + "\n")
     for i, t in enumerate(tickets, 1):
         print(f"  {i}. " + " ".join(f"{x:02d}" for x in t))
     d = ROOT / "picks" / game
@@ -78,7 +79,7 @@ def cmd_pick(game, a):
     if f.exists() and not a.force:
         print(f"\n{f.name} 已存在，未覆盖（--force 可覆盖）")
         return
-    f.write_text(json.dumps({"id": issue, "hot": hot, "tickets": tickets}, ensure_ascii=False, indent=1))
+    f.write_text(json.dumps({"id": issue, "hot": hot, "bayes": binfo, "tickets": tickets}, ensure_ascii=False, indent=1))
     print(f"\n已保存 japan/picks/{game}/{f.name}")
 
 
@@ -98,6 +99,9 @@ def cmd_check(game, _):
 
 def cmd_sprt(game, _):
     c = CFG[game]
+    if c["hot"] is None:
+        print(f"{c['title']} 没有前瞻检验对象")
+        return
     p0, p1 = c["M"] / c["K"], c["p1"]
     A = log(19)
     L = 0.0

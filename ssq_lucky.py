@@ -82,14 +82,11 @@ def cmd_pick(a):
     issue = next_issue(rows[-1][0])
     print(f"双色球 第 {issue} 期（数据截至 {rows[-1][0]}）")
     print(f"红球 24（前瞻检验对象）：自 {HOT_SINCE} 起 {k}/{n} 期 = {k / n:.3f}（理论 {P0:.3f}），z={z:+.2f}")
-    print(f"雷达下注档热球：{hot:02d}，每注都含它" if use else "雷达下注档无热球，均匀随机")
-    tickets, blues = [], []
-    others = [x for x in range(1, 34) if x != hot]
-    while len(tickets) < 5:
-        r = sorted(([hot] if use else []) + rng.sample(others if use else list(range(1, 34)), 5 if use else 6))
-        if r in tickets or any(len(set(r) & set(t)) > (3 if use else 2) for t in tickets):
-            continue
-        tickets.append(r)
+    print("红球：动态贝叶斯 PL 最优 5 注" + (f"，每注含雷达热球 {hot:02d}" if use else "（雷达无热球）"))
+    from bayes_pick import bayes_tickets, describe
+    tickets, binfo = bayes_tickets("双色球", hot if use else None, 5)
+    print(describe(binfo, hot if use else None))
+    blues = []
     while len(blues) < 5:
         b = rng.randint(1, 16)
         if b not in blues:
@@ -102,7 +99,7 @@ def cmd_pick(a):
     if f.exists() and not a.force:
         print(f"\n{f.name} 已存在，未覆盖（--force 可覆盖）")
         return
-    f.write_text(json.dumps({"issue": issue, "hot": hot if use else None, "z24": round(z, 3),
+    f.write_text(json.dumps({"issue": issue, "hot": hot if use else None, "z24": round(z, 3), "bayes": binfo,
                              "tickets": [{"red": r, "blue": b} for r, b in zip(tickets, blues)]}, ensure_ascii=False, indent=1))
     print(f"\n已保存 picks_ssq/{f.name}")
 
