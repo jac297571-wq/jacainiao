@@ -5,10 +5,12 @@
 用法：
   python llm/eval_mlx.py --model mlx-community/Qwen2.5-3B-Instruct-4bit --game 大乐透                         # 微调前
   python llm/eval_mlx.py --model mlx-community/Qwen2.5-3B-Instruct-4bit --adapter llm/adapters_dlt --game 大乐透  # 微调后
+  加 --pause 0.5 可降低 GPU 占用（每次生成后暂停 0.5 秒），电脑仍可流畅使用，只是更慢
 """
 import argparse
 import re
 import sys
+import time
 from math import comb, log
 from pathlib import Path
 
@@ -56,6 +58,7 @@ def main():
     ap.add_argument("--game", default="大乐透", choices=list(GAMES))
     ap.add_argument("--n", type=int, default=100)
     ap.add_argument("--samples", type=int, default=40)
+    ap.add_argument("--pause", type=float, default=0.0, help="每次生成后暂停的秒数，给 GPU 留出空闲（例如 0.5）")
     a = ap.parse_args()
     rows, ld, K, M = rows_for(a.game)
     sample = sampler_fn(a.model, a.adapter)
@@ -67,6 +70,8 @@ def main():
         msg = user_msg(a.game, K, M, rows[t - W:t])
         for _ in range(a.samples):
             nums = parse(sample(msg), K, M)
+            if a.pause:
+                time.sleep(a.pause)
             valid += len(nums) == M
             for n in nums:
                 c[n - 1] += 1
