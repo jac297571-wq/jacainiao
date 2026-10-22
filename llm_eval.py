@@ -83,7 +83,7 @@ def main():
             d = json.loads(line)
             cache[d["t"]] = d["resp"]
     base = -log(comb(K, M))
-    g_llm, g_freq, hits = [], [], []
+    g_llm, g_freq, hits, ok = [], [], [], 0
     start = len(rows) - a.n
     for t in range(start, len(rows)):
         hist = rows[t - a.window:t]
@@ -95,6 +95,7 @@ def main():
                 fh.write(json.dumps({"t": t, "resp": resp}, ensure_ascii=False) + "\n")
             print(f"  第 {t - start + 1}/{a.n} 期，用时 {time.time() - t0:.0f}s", flush=True)
         w = parse(cache[t], K)
+        ok += w is not None and (w > 0).sum() >= M
         if w is None:
             w = np.ones(K)  # 回答无法解析：按均匀处理（不给模型加分也不扣分）
         p = (1 - SMOOTH) * w / w.sum() + SMOOTH / K
@@ -115,7 +116,8 @@ def main():
     out = [f"# {a.model} · {a.game} · 最近 {a.n} 期前瞻评测（窗口 {a.window} 期）\n",
            "| 预测者 | 总增益（比特） | 头奖概率倍数 | z |", "|---|---|---|---|",
            "| 纯随机 | +0.00 | ×1.0000 | — |", line("近期频率（朴素基线）", g_freq), line(a.model, g_llm),
-           f"\n模型每期最看好的 {M} 个号码平均命中 {np.mean(hits):.3f} 个（随机期望 {M * M / K:.3f}）。",
+           f"\n有效回答比例 {ok / a.n:.0%}（拒答或格式错误按均匀处理；低于 90% 时结果不可信）。",
+           f"模型每期最看好的 {M} 个号码平均命中 {np.mean(hits):.3f} 个（随机期望 {M * M / K:.3f}）。",
            "倍数 < 1 表示比随机选号更差。参考：贝叶斯模型当前各彩种约 ×1.00–1.22（见 report_dynpl.md）。"]
     text = "\n".join(out)
     print("\n" + text)
