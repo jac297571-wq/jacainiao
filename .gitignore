@@ -1,3 +1,5 @@
 __pycache__/
 data/world/raw/
 llm_cache/
+llm/data_*/
+llm/adapters_*/
