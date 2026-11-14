@@ -253,3 +253,12 @@ python3 cifulucky.py --update   # 抓开奖 + 出球顺序/套号 → 重新拟�
 
 三个选号器都改用 `bayes_pick.py`：动态贝叶斯 Plackett-Luce（`deep/dynpl.py`）当前后验下的最优 5 注，每注都包含雷达热球（相当于把最优组合里最弱的号码换成热球）。后验完全平坦（证据支持纯随机，例如ロト6）时随机选号。选号文件里记录每注的贝叶斯头奖概率倍数，开奖后由 check 核对。
 - `python3 cifulucky.py pick` / `python3 ssq_lucky.py pick` / `python3 japan/jp_lucky.py loto6|loto7|miniloto pick`
+
+## 撞号模型与 B 轨（`popularity.py` → [report_popularity.md](report_popularity.md)、[report_popularity_picks.md](report_popularity_picks.md)，2026-11-14 起）
+
+中奖概率之外的另一半：**中了以后要和多少人分**。每期各奖级的"实际中奖注数 ÷ 按销量算的随机期望注数"就是开出号码的热门度。
+- **回测**：前 80% 期数训练、后 20% 检验，五个彩种的头奖撞号人数都能被预测（p≤0.015）。模型认为最冷门的 20% 开奖号码，实际撞号是平均的 0.53–0.82 倍；最热门的 20% 是 1.23–1.91 倍。
+- **数据推翻的想当然**：全是大号在双色球、ロト6、ミニロト 里更冷门（×0.6 左右）；大乐透含 3 个 01–07 并不更热门；等差数列极热门（ミニロト 第621回 06 12 18 24 30，头奖 1129 注、期望 20 注）。
+- **B 轨**：按"概率倍数 × 中奖后的奖金倍数"选号，与现行 A 轨并行记账（`picks_b/`）。只在历史开奖号码的热门度范围内选，头奖模型按留出数据的校准斜率收缩。
+- **前瞻验证**：模型冻结在 `popularity_model.json`，之后每期开奖用 `python3 popularity.py track` 比较"用模型"与"不用模型"对实际中奖注数的预测，累计对数似然差（比特）记入 `popularity_log.csv`。
+- 命令：`backtest`、`freeze`、`track`、`pick [彩种]`、`checkb [彩种]`、`score <彩种> 号码…`

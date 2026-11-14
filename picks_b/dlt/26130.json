@@ -1,0 +1,88 @@
+{
+ "id": "26130",
+ "hot": [],
+ "tickets": [
+  {
+   "main": [
+    1,
+    3,
+    4,
+    7,
+    35
+   ],
+   "extra": [
+    11,
+    12
+   ],
+   "mult": 1.0784,
+   "popularity": 0.632,
+   "prize_factor": 1.088
+  },
+  {
+   "main": [
+    1,
+    3,
+    6,
+    7,
+    34
+   ],
+   "extra": [
+    2,
+    12
+   ],
+   "mult": 1.0738,
+   "popularity": 0.637,
+   "prize_factor": 1.087
+  },
+  {
+   "main": [
+    1,
+    2,
+    4,
+    6,
+    7
+   ],
+   "extra": [
+    1,
+    12
+   ],
+   "mult": 1.0944,
+   "popularity": 0.722,
+   "prize_factor": 1.069
+  },
+  {
+   "main": [
+    1,
+    3,
+    4,
+    6,
+    21
+   ],
+   "extra": [
+    1,
+    2
+   ],
+   "mult": 1.0741,
+   "popularity": 0.674,
+   "prize_factor": 1.079
+  },
+  {
+   "main": [
+    2,
+    3,
+    6,
+    7,
+    35
+   ],
+   "extra": [
+    2,
+    11
+   ],
+   "mult": 1.0741,
+   "popularity": 0.722,
+   "prize_factor": 1.069
+  }
+ ],
+ "a_value": 1.0491,
+ "b_value": 1.1637
+}
