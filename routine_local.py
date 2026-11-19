@@ -60,6 +60,13 @@ class Run:
         return False
 
 
+def last_block(text, head, n=5):
+    """check 会列出全部历史；只取最后一期：标题行 + 其后 n 行"""
+    lines = text.splitlines()
+    idx = [i for i, ln in enumerate(lines) if re.search(head, ln)]
+    return [ln.strip() for ln in lines[idx[-1]:idx[-1] + n + 1]] if idx else []
+
+
 def last_csv(path, col):
     rows = list(csv.DictReader((ROOT / path).open(encoding="utf-8")))
     return rows[-1][col] if rows else ""
@@ -76,8 +83,7 @@ def dlt(no_wait):
     if not R.wait_for([("scripts/fetch.py",), ("scripts/fetch_ballset.py",)],
                       lambda: last_csv("data/dlt_history.csv", "date") == today, "大乐透", no_wait):
         return R
-    R.sh("cifulucky.py", "check", keep=r"^\d{5}: 开奖")
-    R.summary.append("A 轨上期：" + "、".join(re.findall(r"前\d\+后\d", R.out[-1].split("开奖")[-1])[:5]))
+    R.summary += ["A 轨上期 " + ln for ln in last_block(R.sh("cifulucky.py", "check"), r"^\d{5}: 开奖")]
     R.sh("cifulucky.py", "watch")
     R.sh("cifulucky.py", "sprt", keep=r"^累计")
     R.sh("cifulucky.py", "pick", keep=r"合计头奖概率|^\s+[1-5]\. ")
@@ -102,7 +108,7 @@ def ssq(no_wait):
             R.summary = ["⚠️ 双色球数据未更新（以上选号基于旧数据，已有文件不会被覆盖）"]
             return R
         time.sleep(WAIT)
-    R.sh("ssq_lucky.py", "check", keep=r"^\d{7}: 开奖")
+    R.summary += ["A 轨上期 " + ln for ln in last_block(R.sh("ssq_lucky.py", "check"), r"^\d{7}: 开奖")]
     R.sh("ssq_lucky.py", "sprt", keep=r"^已观察")
     R.sh("radar.py", keep=r"证明档告警|^双色球")
     R.sh("popularity.py", "track", keep=r"双色球：|合计")
@@ -127,8 +133,7 @@ def jp(no_wait):
     else:
         R.sh("japan/scripts/fetch_loto.py")
     for g in games:
-        R.sh("japan/jp_lucky.py", g, "check", keep=r"^第\d+回：开奖")
-        R.summary.append("A 轨上回：" + "、".join(re.findall(r"中 \d 个", R.out[-1].split("开奖")[-1])[:5]))
+        R.summary += [f"{JP_NAMES[g]} A 轨上回 " + ln for ln in last_block(R.sh("japan/jp_lucky.py", g, "check"), r"^第\d+回：开奖")]
         R.sh("japan/jp_lucky.py", g, "pick", keep=r"合计头奖概率|^\s+[1-5]\. ")
         if g != "loto6":
             R.sh("japan/jp_lucky.py", g, "sprt", keep=r"^已观察")
@@ -167,7 +172,7 @@ def finish(R, push):
     report = "\n".join(R.summary)
     log.write_text(report + "\n\n" + "\n".join(R.out), encoding="utf-8")
     print(f"===== {R.name} =====\n{report}\n（完整输出：{log.relative_to(ROOT)}）")
-    subprocess.run(["git", "add", "-A", "--", ".", ":!logs"], cwd=ROOT)
+    subprocess.run(["git", "add", "-A"], cwd=ROOT)
     if subprocess.run(["git", "diff", "--cached", "--quiet"], cwd=ROOT).returncode:
         subprocess.run(["git", "commit", "-qm", f"{R.name} {dt.date.today()} 开奖核对与选号（本机例行）"], cwd=ROOT)
         if push:

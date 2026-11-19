@@ -262,3 +262,11 @@ python3 cifulucky.py --update   # 抓开奖 + 出球顺序/套号 → 重新拟�
 - **B 轨**：按"概率倍数 × 中奖后的奖金倍数"选号，与现行 A 轨并行记账（`picks_b/`）。只在历史开奖号码的热门度范围内选，头奖模型按留出数据的校准斜率收缩。
 - **前瞻验证**：模型冻结在 `popularity_model.json`，之后每期开奖用 `python3 popularity.py track` 比较"用模型"与"不用模型"对实际中奖注数的预测，累计对数似然差（比特）记入 `popularity_log.csv`。
 - 命令：`backtest`、`freeze`、`track`、`pick [彩种]`、`checkb [彩种]`、`score <彩种> 号码…`
+
+## 本机例行任务（`routine_local.py`，2026-11-19 起）
+
+云端例行任务需要大模型额度；整套流程本身是确定性脚本，可以在自己的 Mac 上定时跑，不消耗额度。
+- 安装：在 Mac 的仓库根目录 `bash scripts/install_launchd.sh`（可选手机推送：`NTFY_TOPIC=自定义主题名 bash scripts/install_launchd.sh`，手机装 ntfy App 订阅同名主题）。卸载：`bash scripts/install_launchd.sh uninstall`。
+- 时间（JST）：大乐透 周一/三/六 23:47，双色球 周二/四/日 23:37，日本 周一至五 22:51。合盖睡眠时到点不跑，唤醒后补跑一次。
+- 手动补跑：`python3 routine_local.py all`（按今天的日期跑该跑的）；单跑 `dlt` / `ssq` / `jp`。
+- 每次：抓数（没更新每 15 分钟重试，最多 4 次）→ 核对 → A/B/收敛选号 → 雷达、ナンバーズ哨兵、撞号模型 → git 提交推送 → macOS 通知。完整输出在 `logs/`（不提交）。
