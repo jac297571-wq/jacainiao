@@ -3,3 +3,4 @@ data/world/raw/
 llm_cache/
 llm/data_*/
 llm/adapters_*/
+logs/
