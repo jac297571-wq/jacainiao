@@ -1,11 +1,11 @@
 {
  "ナンバーズ3": {
-  "latest": "7115",
-  "date": "2026-11-16",
+  "latest": "7118",
+  "date": "2026-11-19",
   "payout_median": 88050.0,
   "threshold": 0.849,
   "alarm": false,
-  "wheel_chi2": 10.9,
+  "wheel_chi2": 10.8,
   "wheel_threshold": 30.5,
   "wheel_alarm": false,
   "windows": [
@@ -18,28 +18,28 @@
    {
     "W": 300,
     "best": "639",
-    "ev": 0.882,
-    "p_ev_gt_1": 0.267
+    "ev": 0.898,
+    "p_ev_gt_1": 0.29
    },
    {
     "W": 1000,
     "best": "100",
     "ev": 0.64,
-    "p_ev_gt_1": 0.001
+    "p_ev_gt_1": 0.0
    }
   ],
   "mini": [
    {
     "W": 100,
     "best": "80",
-    "ev": 0.679,
-    "p_ev_gt_1": 0.06
+    "ev": 0.678,
+    "p_ev_gt_1": 0.057
    },
    {
     "W": 300,
     "best": "39",
-    "ev": 0.655,
-    "p_ev_gt_1": 0.01
+    "ev": 0.68,
+    "p_ev_gt_1": 0.012
    },
    {
     "W": 1000,
@@ -52,32 +52,32 @@
   "mini_alarm": false
  },
  "ナンバーズ4": {
-  "latest": "7115",
-  "date": "2026-11-16",
-  "payout_median": 972550.0,
+  "latest": "7118",
+  "date": "2026-11-19",
+  "payout_median": 985850.0,
   "threshold": 0.969,
   "alarm": false,
-  "wheel_chi2": 23.1,
+  "wheel_chi2": 22.1,
   "wheel_threshold": 28.6,
   "wheel_alarm": false,
   "windows": [
    {
     "W": 100,
-    "best": "8500",
-    "ev": 1.467,
-    "p_ev_gt_1": 0.786
+    "best": "0500",
+    "ev": 1.308,
+    "p_ev_gt_1": 0.693
    },
    {
     "W": 300,
-    "best": "9501",
-    "ev": 1.067,
-    "p_ev_gt_1": 0.546
+    "best": "9524",
+    "ev": 1.08,
+    "p_ev_gt_1": 0.566
    },
    {
     "W": 1000,
     "best": "2394",
-    "ev": 0.966,
-    "p_ev_gt_1": 0.389
+    "ev": 0.988,
+    "p_ev_gt_1": 0.439
    }
   ]
  }
