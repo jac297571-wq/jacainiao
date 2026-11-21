@@ -165,6 +165,25 @@ def notify(title, body):
             print("ntfy 推送失败：", e)
 
 
+def sync():
+    """先把远端的新提交合进来（变基到远端之上；本机未提交的改动临时收起）。冲突时以远端为准，免得卡住后面每一次推送。"""
+    r = subprocess.run(["git", "pull", "-q", "--rebase", "--autostash"], cwd=ROOT, capture_output=True, text=True)
+    if r.returncode:
+        subprocess.run(["git", "rebase", "--abort"], cwd=ROOT, capture_output=True)
+        subprocess.run(["git", "pull", "-q", "--no-rebase", "--no-edit", "-X", "theirs"], cwd=ROOT, capture_output=True)
+    return r
+
+
+def push_with_retry(R):
+    for _ in range(3):
+        r = subprocess.run(["git", "push", "-q"], cwd=ROOT, capture_output=True, text=True)
+        if r.returncode == 0:
+            return
+        sync()
+    R.summary.append("⚠️ git push 失败：" + (r.stderr.strip().splitlines() or ["未知原因"])[-1])
+    (LOGS / "push_error.log").write_text(r.stderr, encoding="utf-8")
+
+
 def finish(R, push):
     LOGS.mkdir(exist_ok=True)
     stamp = dt.datetime.now().strftime("%Y-%m-%d_%H%M")
@@ -176,7 +195,7 @@ def finish(R, push):
     if subprocess.run(["git", "diff", "--cached", "--quiet"], cwd=ROOT).returncode:
         subprocess.run(["git", "commit", "-qm", f"{R.name} {dt.date.today()} 开奖核对与选号（本机例行）"], cwd=ROOT)
         if push:
-            subprocess.run(["git", "push", "-q"], cwd=ROOT)
+            push_with_retry(R)
     if not getattr(R, "quiet", False):
         notify(R.name, report)
 
@@ -185,7 +204,7 @@ def main():
     args = sys.argv[1:]
     which = next((a for a in args if not a.startswith("--")), "all")
     push, no_wait = "--no-push" not in args, "--no-wait" in args
-    subprocess.run(["git", "pull", "-q", "--ff-only"], cwd=ROOT)
+    sync()
     todo = {"dlt": [dlt], "ssq": [ssq], "jp": [jp]}.get(which)
     if todo is None:
         wd = dt.datetime.now(CN).weekday()
