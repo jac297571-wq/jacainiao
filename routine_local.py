@@ -88,7 +88,7 @@ def dlt(no_wait):
     R.sh("cifulucky.py", "sprt", keep=r"^累计")
     R.sh("cifulucky.py", "pick", keep=r"合计头奖概率|^\s+[1-5]\. ")
     R.sh("radar.py", keep=r"证明档告警")
-    R.sh("popularity.py", "track", keep=r"大乐透：|合计")
+    R.sh("popularity.py", "track", keep=r"大乐透：|【判定】")
     R.sh("popularity.py", "checkb", "大乐透", keep=r"B 轨")
     R.sh("popularity.py", "pick", "大乐透", keep=r"期望值|^\s+B:")
     R.sh("pool_pick.py", "check", keep=r"收敛选号第|等$|等\s*$")
@@ -111,7 +111,7 @@ def ssq(no_wait):
     R.summary += ["A 轨上期 " + ln for ln in last_block(R.sh("ssq_lucky.py", "check"), r"^\d{7}: 开奖")]
     R.sh("ssq_lucky.py", "sprt", keep=r"^已观察")
     R.sh("radar.py", keep=r"证明档告警|^双色球")
-    R.sh("popularity.py", "track", keep=r"双色球：|合计")
+    R.sh("popularity.py", "track", keep=r"双色球：|【判定】")
     R.sh("popularity.py", "checkb", "双色球", keep=r"B 轨")
     R.sh("popularity.py", "pick", "双色球", keep=r"期望值|^\s+B:")
     return R
@@ -142,7 +142,7 @@ def jp(no_wait):
     alarms = [ln for ln in nw.splitlines() if ln.startswith("ナンバーズ") and "无告警" not in ln]
     R.summary = ([f"🚨 {ln.strip()}" for ln in alarms] or ["ナンバーズ无告警"]) + R.summary
     for g in games:
-        R.sh("popularity.py", "track", keep=JP_NAMES[g] + "：|合计")
+        R.sh("popularity.py", "track", keep=JP_NAMES[g] + "：|【判定】")
         R.sh("popularity.py", "checkb", JP_NAMES[g], keep=r"B 轨")
         R.sh("popularity.py", "pick", JP_NAMES[g], keep=r"期望值|^\s+B:")
     R.quiet = not games and not alarms

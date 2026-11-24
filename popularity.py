@@ -354,7 +354,8 @@ def popularity(game, main, extra=(), tier=None, model=None):
 
 
 def track():
-    """前瞻验证：模型冻结之后的每期，比较“用模型”和“不用模型（只用基线）”对实际中奖注数的预测，累计对数似然差（比特）"""
+    """前瞻验证：模型冻结之后的每期，比较“用模型”和“不用模型（只用基线）”对实际中奖注数的预测，累计对数似然差（比特）。
+    判定只看头奖这一级（B 轨押的是“中头奖时少人分”）；低等奖的比特只作参考。"""
     model = json.loads(MODEL_FILE.read_text(encoding="utf-8"))
     done = set()
     if LOG_FILE.exists():
@@ -399,9 +400,13 @@ def track():
         last = max((r["id"] for r in g), key=int)
         lt = [r for r in top if r["id"] == last]
         tail = f"；最新一期 {last} 头奖：实际 {lt[0]['actual']} 注，模型预计 {lt[0]['expected_model']}，不用模型预计 {lt[0]['expected_base']}" if lt else ""
-        print(f"  {game}：{len({r['id'] for r in g})} 期，累计证据 {bits:+.2f} 比特（正 = 模型比不用模型预测得准）{tail}")
+        tb = sum(float(r["bits"]) for r in top)
+        print(f"  {game}：{len({r['id'] for r in g})} 期，头奖 {tb:+.2f} 比特，全部奖级 {bits:+.2f} 比特{tail}")
     tot = sum(float(r["bits"]) for r in allr)
-    print(f"  合计 {tot:+.2f} 比特。达到 +10 比特可认为模型在新数据上确实有效；低于 −10 比特则模型失效。")
+    ttop = sum(float(r["bits"]) for r in allr if r["tier"] == TOP[r["game"]])
+    verdict = "✅ 已达标：可以把 B 轨转为正式选号" if ttop >= 10 else ("❌ 模型失效" if ttop <= -10 else "尚未下结论")
+    print(f"  【判定】头奖合计 {ttop:+.2f} 比特（+10 达标，−10 失效）：{verdict}")
+    print(f"  参考：全部奖级合计 {tot:+.2f} 比特（低等奖注数多、本来就好预测，不作为判定依据）")
 
 
 # ───────────── 得失对比与 B 轨选号 ─────────────
